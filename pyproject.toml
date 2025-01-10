@@ -16,3 +16,8 @@ dev = [
     "mypy>=1.14.1",
     "pytest>=8.3.4",
 ]
+
+[tool.ruff]
+lint.select = ["E", "F"]
+line-length = 100
+lint.per-file-ignores = {"__init__.py" = ["F401"]}
