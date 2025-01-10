@@ -13,9 +13,7 @@ class MCTSResult:
 
 
 class MonteCarloLLM:
-    def __init__(
-        self, model_name: str, endpoint: str = None, api_key: str = None
-    ) -> None:
+    def __init__(self, model_name: str, endpoint: str = "", api_key: str = "") -> None:
         load_dotenv()
 
         self.model_name = model_name
@@ -35,7 +33,8 @@ class MonteCarloLLM:
             MCTSResult: An object containing the generated answer, the complete MCTS tree,
             and the valid path representing the sequence of decisions leading to the answer.
         """
-        pass
+        raise NotImplementedError("Implement me!")
+        return None
 
     def __str__(self) -> str:
         return f"MonteCarloLLM(model_name={self.model_name}, endpoint={self.endpoint})"
