@@ -15,6 +15,7 @@ _*.py
 # editor files etc.
 .vscode/
 .DS_Store
+Makefile
 
 # env files
 .env
