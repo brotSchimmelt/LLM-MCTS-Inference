@@ -7,7 +7,7 @@ class RatingResponse(BaseModel):
 
 
 class ImprovedResponse(BaseModel):
-    ImprovedResponse: str
+    ImprovedText: str
 
 
 critique_prompt = """
