@@ -4,6 +4,9 @@ import openai
 import outlines
 from pydantic import BaseModel
 
+from .prompts import ImprovedResponse, RatingResponse, critique_prompt, rating_prompt, refine_prompt
+from .utils import normalize_rating_score
+
 
 def generate_initial_answer(prompt: str, model_settings: Dict[str, Any]) -> str:
     """
@@ -24,12 +27,39 @@ def generate_initial_answer(prompt: str, model_settings: Dict[str, Any]) -> str:
     return get_model_response(prompt, model_settings)
 
 
-def generate_rating(prompt: str, model_settings: Dict[str, Any]) -> int:
-    raise NotImplementedError("Implement me!")
-    return 0
+def generate_rating(
+    prompt: str, answer: str, model_settings: Dict[str, Any], rating_schema: BaseModel
+) -> float:
+    """
+    Generates a normalized rating score for a given answer based on a prompt and schema.
+
+    Args:
+        prompt (str): The original input prompt to guide the model's response.
+        answer (str): The generated or improved answer to be rated.
+        model_settings (Dict[str, Any]): A dictionary containing configuration settings
+            for the model, such as API key, model name, and decoding parameters.
+        rating_schema (BaseModel): A Pydantic schema that defines the structure of the
+            expected rating response.
+
+    Returns:
+        float: A normalized rating score within the range [0, 0.95].
+    """
+    rating_response = get_structured_model_response(
+        rating_prompt.format(original_prompt=prompt, improved_answer=answer),
+        model_settings=model_settings,
+        json_schema=RatingResponse,
+    )
+    rating = rating_response.rating
+
+    # check type of the rating
+    if not isinstance(rating, (int, str)):
+        rating = str(rating)
+
+    # normalize the rating to be within the range [0, 0.95]
+    return normalize_rating_score(rating)
 
 
-def generate_feedback_and_rating(prompt: str, answer: str, model_settings: Dict[str, Any]) -> str:
+def generate_feedback(prompt: str, answer: str, model_settings: Dict[str, Any]) -> str:
     raise NotImplementedError("Implement me!")
     return ""
 
@@ -78,7 +108,7 @@ def get_model_response(prompt: str, model_settings: Dict[str, Any]) -> str:
 
 
 def get_structured_model_response(
-    prompt: str, model_settings: Dict[str, Any], json_schema: BaseModel
+    prompt: str, model_settings: Dict[str, Any], json_schema: Any
 ) -> Any:
     """
     Generates a structured response using an LLM based on the provided prompt and schema.
@@ -93,7 +123,7 @@ def get_structured_model_response(
             - "max_tokens" (int): The maximum number of tokens to generate in the response.
             - "temperature" (float): The temperature for response sampling (controls randomness).
             - "top_p" (float): The nucleus sampling parameter for response diversity.
-        json_schema (BaseModel): A Pydantic model that defines the expected structure of the
+        json_schema (Any): A Pydantic model that defines the expected structure of the
             response.
 
     Returns:
