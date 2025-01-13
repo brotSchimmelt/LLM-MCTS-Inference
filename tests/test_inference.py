@@ -3,7 +3,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import BaseModel
 
-from llm_mcts_inference.inference import get_model_response, get_structured_model_response
+from llm_mcts_inference.inference import (
+    generate_initial_answer,
+    get_model_response,
+    get_structured_model_response,
+)
 
 
 @pytest.fixture
@@ -86,3 +90,36 @@ def test_get_structured_model_response(mock_outlines):
         "llama3", base_url="http://localhost:11434/v1", api_key="mock_api_key"
     )
     mock_outlines[1].assert_called_once()
+
+
+def test_generate_initial_answer(mock_openai_client):
+    """Test the generate_initial_answer function."""
+    model_settings = {
+        "base_url": "http://localhost:11434/v1",
+        "api_key": "mock_api_key",
+        "model_name": "gpt-3.5-turbo",
+        "max_tokens": 100,
+        "temperature": 0.7,  # these will be overwritten in the function
+        "top_p": 0.9,  # these will be overwritten in the function
+        "seed": 42,
+    }
+    prompt = "Explain machine learning in simple terms."
+
+    response = generate_initial_answer(prompt, model_settings)
+
+    # Verify the response
+    assert response == "This is a mock response"
+
+    # Ensure the temperature and top_p were overridden
+    assert model_settings["temperature"] == 0.0
+    assert model_settings["top_p"] == 1.0
+
+    mock_openai_client.assert_called_once()
+    mock_openai_client.return_value.completions.create.assert_called_once_with(
+        model="gpt-3.5-turbo",
+        prompt=prompt,
+        max_tokens=100,
+        temperature=0.0,  # confirm overridden value
+        top_p=1.0,  # confirm overridden value
+        seed=42,
+    )

@@ -6,8 +6,27 @@ from pydantic import BaseModel
 
 
 def generate_initial_answer(prompt: str, model_settings: Dict[str, Any]) -> str:
+    """
+    Generates the initial answer using greedy decoding.
+
+    Args:
+        prompt (str): The input prompt to guide the model's response.
+        model_settings (Dict[str, Any]): A dictionary containing configuration settings
+            for the model, including temperature, top_p, and other parameters.
+
+    Returns:
+        str: The initial response from the model as a string.
+    """
+    # greedy decoding parameters
+    model_settings["temperature"] = 0.0
+    model_settings["top_p"] = 1.0
+
+    return get_model_response(prompt, model_settings)
+
+
+def generate_rating(prompt: str, model_settings: Dict[str, Any]) -> int:
     raise NotImplementedError("Implement me!")
-    return ""
+    return 0
 
 
 def generate_feedback_and_rating(prompt: str, answer: str, model_settings: Dict[str, Any]) -> str:
@@ -22,12 +41,9 @@ def generate_improved_version(
     return ""
 
 
-def get_model_response(prompt: str, model_settings: Dict[str, Any]) -> Any:
+def get_model_response(prompt: str, model_settings: Dict[str, Any]) -> str:
     """
     Generates a response from an LLM based on the provided prompt and model settings.
-
-    This function uses OpenAI's LLM API to generate a text response. The model settings
-    include configuration parameters like the model name, maximum tokens, temperature, and others.
 
     Args:
         prompt (str): The input prompt to guide the model's response.
@@ -42,7 +58,7 @@ def get_model_response(prompt: str, model_settings: Dict[str, Any]) -> Any:
             - "seed" (int): A seed value for deterministic responses.
 
     Returns:
-        Any: The generated text response from the LLM.
+        str: The generated text response from the LLM.
     """
     client = openai.OpenAI(
         base_url=str(model_settings["base_url"]),
@@ -58,7 +74,7 @@ def get_model_response(prompt: str, model_settings: Dict[str, Any]) -> Any:
         seed=int(model_settings["seed"]),
     )
 
-    return response.choices[0].text
+    return str(response.choices[0].text)
 
 
 def get_structured_model_response(
@@ -66,9 +82,6 @@ def get_structured_model_response(
 ) -> Any:
     """
     Generates a structured response using an LLM based on the provided prompt and schema.
-
-    This function uses the `outlines` library to interact with an LLM, generating a
-    response that adheres to the structure defined by the given `json_schema`.
 
     Args:
         prompt (str): The input prompt to guide the model's response.
