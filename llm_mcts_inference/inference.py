@@ -106,7 +106,7 @@ def generate_improved_version(
     response = improved_response.ImprovedText
 
     if not isinstance(response, str):
-        response = str(response)
+        return str(response)
 
     return response
 
