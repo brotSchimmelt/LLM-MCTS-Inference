@@ -2,7 +2,6 @@ from typing import Any, Dict, cast
 
 import openai
 import outlines
-from pydantic import BaseModel
 
 from .prompts import ImprovedResponse, RatingResponse, critique_prompt, rating_prompt, refine_prompt
 from .utils import normalize_rating_score
@@ -21,15 +20,14 @@ def generate_initial_answer(prompt: str, model_settings: Dict[str, Any]) -> str:
         str: The initial response from the model as a string.
     """
     # greedy decoding parameters
-    model_settings["temperature"] = 0.0
-    model_settings["top_p"] = 1.0
+    greedy_model_settings = model_settings.copy()
+    greedy_model_settings["temperature"] = 0.0
+    greedy_model_settings["top_p"] = 1.0
 
-    return get_model_response(prompt, model_settings)
+    return get_model_response(prompt, greedy_model_settings)
 
 
-def generate_rating(
-    prompt: str, answer: str, model_settings: Dict[str, Any], rating_schema: BaseModel
-) -> float:
+def generate_rating(prompt: str, answer: str, model_settings: Dict[str, Any]) -> float:
     """
     Generates a normalized rating score for a given answer based on a prompt and schema.
 
@@ -38,8 +36,6 @@ def generate_rating(
         answer (str): The generated or improved answer to be rated.
         model_settings (Dict[str, Any]): A dictionary containing configuration settings
             for the model, such as API key, model name, and decoding parameters.
-        rating_schema (BaseModel): A Pydantic schema that defines the structure of the
-            expected rating response.
 
     Returns:
         float: A normalized rating score within the range [0, 0.95].

@@ -107,14 +107,8 @@ def test_generate_initial_answer(mock_openai_client):
 
     response = generate_initial_answer(prompt, model_settings)
 
-    # Verify the response
     assert response == "This is a mock response"
 
-    # Ensure the temperature and top_p were overridden
-    assert model_settings["temperature"] == 0.0
-    assert model_settings["top_p"] == 1.0
-
-    mock_openai_client.assert_called_once()
     mock_openai_client.return_value.completions.create.assert_called_once_with(
         model="gpt-3.5-turbo",
         prompt=prompt,
