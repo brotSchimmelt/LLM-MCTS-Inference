@@ -131,16 +131,21 @@ def get_model_response(prompt: str, model_settings: Dict[str, Any]) -> str:
         api_key=str(model_settings["api_key"]),
     )
 
-    response = client.completions.create(
+    response = client.chat.completions.create(
+        messages=[
+            {
+                "role": "user",
+                "content": prompt.strip(),
+            }
+        ],
         model=str(model_settings["model_name"]),
-        prompt=prompt,
         max_tokens=int(model_settings["max_tokens"]),
         temperature=float(model_settings["temperature"]),
         top_p=float(model_settings["top_p"]),
         seed=int(model_settings["seed"]),
     )
 
-    return str(response.choices[0].text)
+    return str(response.choices[0].message.content)
 
 
 def get_structured_model_response(
@@ -181,4 +186,4 @@ def get_structured_model_response(
     )
 
     generator = outlines.generate.json(llm, json_schema, sampler)  # type: ignore[attr-defined]
-    return generator(prompt, max_tokens=int(model_settings["max_tokens"]))
+    return generator(prompt.strip(), max_tokens=int(model_settings["max_tokens"]))
