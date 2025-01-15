@@ -160,8 +160,8 @@ class MCTS:
             self.print_to_terminal(f"Selected node from level: {node.level}")
 
             if not node.is_fully_expanded():
+                self.print_to_terminal(f"Expand node at level: {node.level}")
                 node = self.expand(node)
-                self.print_to_terminal(f"Expanded node at level: {node.level}")
 
             reward: float = self.simulate(node)
             self.print_to_terminal(f"Simulated reward: {reward}")
