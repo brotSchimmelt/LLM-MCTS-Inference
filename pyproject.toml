@@ -5,9 +5,9 @@ description = "An experimental project using Monte Carlo Tree Search (MCTS) to r
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "instructor>=1.7.2",
+    "litellm>=1.59.0",
     "numpy>=2.2.1",
-    "openai>=1.59.6",
-    "outlines>=0.1.11",
     "python-dotenv>=1.0.1",
 ]
 
@@ -19,5 +19,5 @@ dev = [
 
 [tool.ruff]
 lint.select = ["E", "F"]
-line-length = 100
 lint.per-file-ignores = {"__init__.py" = ["F401"]}
+line-length = 100

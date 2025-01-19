@@ -1,10 +1,19 @@
-from typing import Any, Dict, cast
+import warnings
+from typing import Any, Dict
 
-import openai
-import outlines
+warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 
-from .prompts import ImprovedResponse, RatingResponse, critique_prompt, rating_prompt, refine_prompt
-from .utils import normalize_rating_score
+import instructor  # noqa: E402
+import litellm  # noqa: E402
+
+from .prompts import (  # noqa: E402
+    ImprovedResponse,
+    RatingResponse,
+    critique_prompt,
+    rating_prompt,
+    refine_prompt,
+)
+from .utils import normalize_rating_score  # noqa: E402
 
 
 def generate_initial_answer(prompt: str, model_settings: Dict[str, Any]) -> str:
@@ -107,83 +116,68 @@ def generate_improved_version(
     return response
 
 
-def get_model_response(prompt: str, model_settings: Dict[str, Any]) -> str:
+def _validate_request_attributes(prompt: str, model_settings: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Generates a response from an LLM based on the provided prompt and model settings.
+    Prepares and validates the request attributes required to interact with the model API.
 
     Args:
-        prompt (str): The input prompt to guide the model's response.
-        model_settings (Dict[str, Any]): A dict containing configuration settings for the model.
-            Expected keys include:
-            - "base_url" (str): The API endpoint for the LLM.
-            - "api_key" (str): The API key for authenticating requests.
-            - "model_name" (str): The name of the LLM to use.
-            - "max_tokens" (int): The maximum number of tokens to generate in the response.
-            - "temperature" (float): The temperature for response sampling (controls randomness).
-            - "top_p" (float): The nucleus sampling parameter for response diversity.
-            - "seed" (int): A seed value for deterministic responses.
+        prompt (str): The input prompt or query to be sent to the model.
+        model_settings (Dict[str, Any]): Configuration dictionary.
 
     Returns:
-        str: The generated text response from the LLM.
+        Dict[str, Any]: A dictionary containing the attributes required for the API request.
     """
-    client = openai.OpenAI(
-        base_url=str(model_settings["base_url"]),
-        api_key=str(model_settings["api_key"]),
-    )
+    model_name: str = model_settings["model_name"]
 
-    response = client.chat.completions.create(
-        messages=[
-            {
-                "role": "user",
-                "content": prompt.strip(),
-            }
-        ],
-        model=str(model_settings["model_name"]),
-        max_tokens=int(model_settings["max_tokens"]),
-        temperature=float(model_settings["temperature"]),
-        top_p=float(model_settings["top_p"]),
-        seed=int(model_settings["seed"]),
-    )
+    request_attributes: Dict[str, Any] = {
+        "model": model_name,
+        "messages": [{"content": prompt, "role": "user"}],
+    }
 
-    return str(response.choices[0].message.content)
+    if "ollama" in model_name:
+        request_attributes["api_base"] = "http://localhost:11434"
+
+    return request_attributes
+
+
+def get_model_response(prompt: str, model_settings: Dict[str, Any]) -> str:
+    """
+    Sends a prompt to the model and retrieves a textual response.
+
+    Args:
+        prompt (str): The input prompt or query to be sent to the model.
+        model_settings (Dict[str, Any]): Configuration dictionary .
+
+    Returns:
+        str: The model's response as a string extracted from the first choice.
+    """
+    request_attributes: Dict[str, Any] = _validate_request_attributes(prompt, model_settings)
+
+    response = litellm.completion(**request_attributes)
+
+    return str(response["choices"][0]["message"]["content"])
 
 
 def get_structured_model_response(
     prompt: str, model_settings: Dict[str, Any], json_schema: Any
 ) -> Any:
     """
-    Generates a structured response using an LLM based on the provided prompt and schema.
+    Sends a prompt to the model and retrieves a structured response based on a provided JSON schema.
 
     Args:
-        prompt (str): The input prompt to guide the model's response.
-        model_settings (Dict[str, Any]): A dict containing configuration settings for the model.
-            Expected keys include:
-            - "model_name" (str): The name of the LLM to use.
-            - "base_url" (str): The API endpoint for the LLM.
-            - "api_key" (str): The API key for authenticating requests.
-            - "max_tokens" (int): The maximum number of tokens to generate in the response.
-            - "temperature" (float): The temperature for response sampling (controls randomness).
-            - "top_p" (float): The nucleus sampling parameter for response diversity.
-        json_schema (Any): A Pydantic model that defines the expected structure of the
-            response.
+        prompt (str): The input prompt or query to be sent to the model.
+        model_settings (Dict[str, Any]): Configuration dictionary.
+        json_schema (Any): A Pydantic model used to validate the structured response.
 
     Returns:
-        Any: The structured response generated by the LLM, conforming to the given schema.
+        Any: The structured response validated against the provided JSON schema.
+             Typically, this will be an instance of the schema model.
     """
-    model = model_settings["model_name"]
-    base_url = model_settings["base_url"]
-    api_key = model_settings["api_key"]
+    client = instructor.from_litellm(litellm.completion)
 
-    # define the llm to use
-    llm = outlines.models.openai(model, base_url=base_url, api_key=api_key)  # type: ignore[attr-defined]
+    request_attributes: Dict[str, Any] = _validate_request_attributes(prompt, model_settings)
+    request_attributes["response_model"] = json_schema
 
-    # define the sampler we want to use
-    sampler = cast(
-        outlines.samplers.Sampler,
-        outlines.samplers.MultinomialSampler(
-            temperature=float(model_settings["temperature"]), top_p=float(model_settings["top_p"])
-        ),
-    )
+    response = client.create(**request_attributes)
 
-    generator = outlines.generate.json(llm, json_schema, sampler)  # type: ignore[attr-defined]
-    return generator(prompt.strip(), max_tokens=int(model_settings["max_tokens"]))
+    return response
