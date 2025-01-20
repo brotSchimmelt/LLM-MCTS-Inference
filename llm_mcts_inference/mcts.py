@@ -9,6 +9,7 @@ from .inference import (
     generate_initial_answer,
     generate_rating,
 )
+from .prompts import ImprovedResponse, RatingResponse
 
 
 class Node:
@@ -99,6 +100,14 @@ class Node:
             child_node (Node): The child node to add.
         """
         self.children.append(child_node)
+
+    def __str__(self) -> str:
+        return (
+            f"||level={self.level},visits={self.visits},value={self.value}\nanswer={self.answer}||"
+        )
+
+    def __repr__(self) -> str:
+        return self.__str__()
 
 
 class MCTS:
@@ -219,6 +228,7 @@ class MCTS:
                 answer=child_node.answer,
                 feedback=feedback,
                 request_settings=self.request_settings,
+                json_schema=ImprovedResponse,
             )
 
             child_node.answer = improved_version
@@ -254,8 +264,38 @@ class MCTS:
             prompt=self.original_prompt,
             answer=node.answer,
             request_settings=self.request_settings,
+            json_schema=RatingResponse,
         )
         return rating
+
+    def get_best_path(self) -> List[Node]:
+        """
+        Returns the path from the root node to the best node in the tree.
+
+        Returns:
+            List[Node]: A sorted list of nodes representing the path, with the root node as the
+                first element and the best node as the last.
+        """
+        path = []
+        current_node = self.root
+
+        while current_node.children:
+            path.append(current_node)
+            current_node = current_node.best_child()
+
+        path.append(current_node)  # Add the final node (best node)
+        return path
+
+    def get_tree(self) -> Node:
+        """Retrieve the root node of the tree structure.
+
+        This method provides access to the root node of the tree, allowing
+        traversal or manipulation of the tree structure starting from its root.
+
+        Returns:
+            Node: The root node of the tree.
+        """
+        return self.root
 
     def print_to_terminal(self, msg: str) -> None:
         """
