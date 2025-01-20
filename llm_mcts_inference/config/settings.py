@@ -1,8 +1,8 @@
 import numpy as np
 
 DEFAULT_SETTINGS = {
-    "model": "gpt-3.5-turbo",
-    "base_url": "https://api.openai.com/v1",
+    "model": "openai/gpt-4o-mini",
+    "ollama_api_base": "http://localhost:11434",
     "api_key": "EMPTY",
     "max_children": 3,
     "exploration_weight": np.sqrt(2),
@@ -10,7 +10,7 @@ DEFAULT_SETTINGS = {
     "verbose": True,
 }
 
-MODEL_SETTINGS = {
+DEFAULT_REQUEST_SETTINGS = {
     "max_tokens": 8_192,
     "temperature": 1.0,
     "top_p": 0.9,
