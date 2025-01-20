@@ -55,7 +55,7 @@ def test_generate_rating():
         "llm_mcts_inference.inference.get_structured_model_response",
         return_value=mock_rating_response,
     ):
-        response = generate_rating(prompt, answer, request_settings)
+        response = generate_rating(prompt, answer, request_settings, MockRatingResponse)
 
         assert response == 0.85, "Normalized rating score mismatch."
 
@@ -111,7 +111,9 @@ def test_generate_improved_version():
         "llm_mcts_inference.inference.get_structured_model_response",
         return_value=mock_improved_response,
     ):
-        response = generate_improved_version(prompt, answer, feedback, request_settings)
+        response = generate_improved_version(
+            prompt, answer, feedback, request_settings, MockImprovedResponse
+        )
 
         assert (
             response == "The capital of France is Paris, located in Europe."
@@ -155,6 +157,9 @@ def test_get_structured_model_response():
         response = get_structured_model_response(prompt, request_settings, mock_schema)
 
         assert response == mock_structured_response, "Structured response mismatch."
+
         mock_client.create.assert_called_once_with(
-            messages=[{"content": prompt, "role": "user"}], **request_settings
+            response_model=mock_schema,
+            messages=[{"content": prompt, "role": "user"}],
+            **request_settings,
         )

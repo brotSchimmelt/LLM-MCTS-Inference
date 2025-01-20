@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
 warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 
@@ -7,13 +7,11 @@ import instructor  # noqa: E402
 import litellm  # noqa: E402
 
 from .prompts import (  # noqa: E402
-    ImprovedResponse,
-    RatingResponse,
     critique_prompt,
     rating_prompt,
     refine_prompt,
 )
-from .utils import normalize_rating_score  # noqa: E402
+from .utils import extract_first_number, normalize_rating_score  # noqa: E402
 
 
 def generate_initial_answer(prompt: str, request_settings: Dict[str, Any]) -> str:
@@ -36,7 +34,9 @@ def generate_initial_answer(prompt: str, request_settings: Dict[str, Any]) -> st
     return get_model_response(prompt, greedy_request_settings)
 
 
-def generate_rating(prompt: str, answer: str, request_settings: Dict[str, Any]) -> float:
+def generate_rating(
+    prompt: str, answer: str, request_settings: Dict[str, Any], json_schema: Any
+) -> float:
     """
     Generates a normalized rating score for a given answer based on a prompt and schema.
 
@@ -52,9 +52,15 @@ def generate_rating(prompt: str, answer: str, request_settings: Dict[str, Any]) 
     rating_response = get_structured_model_response(
         rating_prompt.format(original_prompt=prompt, improved_answer=answer),
         request_settings=request_settings,
-        json_schema=RatingResponse,
+        json_schema=json_schema,
     )
-    rating = rating_response.rating
+
+    # fallback
+    if isinstance(rating_response, str):
+        extracted_rating: int = extract_first_number(rating_response)
+        return normalize_rating_score(extracted_rating)
+
+    rating: Union[int, str] = rating_response.rating
 
     # check type of the rating
     if not isinstance(rating, (int, str)):
@@ -88,7 +94,7 @@ def generate_feedback(prompt: str, answer: str, request_settings: Dict[str, Any]
 
 
 def generate_improved_version(
-    prompt: str, answer: str, feedback: str, request_settings: Dict[str, Any]
+    prompt: str, answer: str, feedback: str, request_settings: Dict[str, Any], json_schema: Any
 ) -> str:
     """
     Generates an improved version of an answer based on the provided feedback.
@@ -106,8 +112,11 @@ def generate_improved_version(
     improved_response = get_structured_model_response(
         refine_prompt.format(original_prompt=prompt, previous_answer=answer, feedback=feedback),
         request_settings=request_settings,
-        json_schema=ImprovedResponse,
+        json_schema=json_schema,
     )
+    if isinstance(improved_response, str):
+        return improved_response
+
     response = improved_response.ImprovedText
 
     if not isinstance(response, str):
@@ -143,16 +152,30 @@ def get_structured_model_response(
     Args:
         prompt (str): The input prompt or query to be sent to the model.
         request_settings (Dict[str, Any]): Configuration dictionary.
-        json_schema (Any): A Pydantic model used to validate the structured response.
+        json_schema (Any): A JSON schema for the structured output.
 
     Returns:
         Any: The structured response validated against the provided JSON schema.
              Typically, this will be an instance of the schema model.
+             If validation fails, the raw response string is returned as a fallback.
     """
     client = instructor.from_litellm(litellm.completion)
 
-    request_settings["response_model"] = json_schema
-
-    response = client.create(messages=[{"content": prompt, "role": "user"}], **request_settings)
-
-    return response
+    try:
+        response = client.create(
+            response_model=json_schema,
+            messages=[{"content": prompt, "role": "user"}],
+            **request_settings,
+        )
+        return response
+    except Exception as _:
+        try:
+            raw_response = client.create(
+                response_model=None,  # request raw output without schema validation
+                messages=[{"content": prompt, "role": "user"}],
+                **request_settings,
+            )
+            return raw_response["choices"][0]["message"]["content"]
+        except Exception as e:
+            print(f"Error retrieving raw response as fallback: {e}")
+            raise

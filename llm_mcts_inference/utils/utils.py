@@ -1,3 +1,4 @@
+import re
 from typing import Union
 
 
@@ -43,3 +44,19 @@ def is_numeric_score(s: str) -> bool:
     """
     s = s.replace("-", "", 1)
     return s.replace(".", "", 1).isdigit()
+
+
+def extract_first_number(s: str) -> int:
+    """
+    Extracts the first number from a given string.
+
+    Args:
+        s (str): The input string.
+
+    Returns:
+        int: The first number found in the string. Returns None if no number is found.
+    """
+    match = re.search(r"\d+", s)
+    if match:
+        return int(match.group())
+    return 0
