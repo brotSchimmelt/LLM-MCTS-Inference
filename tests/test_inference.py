@@ -1,226 +1,160 @@
 from unittest.mock import patch
 
-import pytest
 from pydantic import BaseModel
 
 from llm_mcts_inference.inference import (
-    _validate_request_attributes,
+    generate_feedback,
+    generate_improved_version,
+    generate_initial_answer,
+    generate_rating,
     get_model_response,
     get_structured_model_response,
 )
 
 
-def test_validate_request_attributes_basic():
+class MockRatingResponse(BaseModel):
+    rating: float
+
+
+class MockImprovedResponse(BaseModel):
+    ImprovedText: str
+
+
+def test_generate_initial_answer():
     """
-    Test _validate_request_attributes with a standard model name.
-    """
-    prompt = "What is the weather today?"
-    model_settings = {"model_name": "gpt-3.5-turbo"}
-
-    expected_result = {
-        "model": "gpt-3.5-turbo",
-        "messages": [{"content": prompt, "role": "user"}],
-    }
-
-    result = _validate_request_attributes(prompt, model_settings)
-    assert result == expected_result, "Basic model configuration failed."
-
-
-def test_validate_request_attributes_with_ollama_model():
-    """
-    Test _validate_request_attributes when model name contains 'ollama'.
-    """
-    prompt = "Summarize this text."
-    model_settings = {"model_name": "ollama-custom-model"}
-
-    expected_result = {
-        "model": "ollama-custom-model",
-        "messages": [{"content": prompt, "role": "user"}],
-        "api_base": "http://localhost:11434",
-    }
-
-    result = _validate_request_attributes(prompt, model_settings)
-    assert result == expected_result, "'ollama' model configuration failed."
-
-
-def test_validate_request_attributes_missing_model_name():
-    """
-    Test _validate_request_attributes when 'model_name' is missing from model_settings.
-    """
-    prompt = "Who won the match yesterday?"
-    model_settings = {}
-
-    with pytest.raises(KeyError) as exc_info:
-        _validate_request_attributes(prompt, model_settings)
-
-    assert "model_name" in str(exc_info.value), "Missing 'model_name' key did not raise KeyError."
-
-
-def test_validate_request_attributes_empty_prompt():
-    """
-    Test _validate_request_attributes with an empty prompt.
-    """
-    prompt = ""
-    model_settings = {"model_name": "gpt-3.5-turbo"}
-
-    expected_result = {
-        "model": "gpt-3.5-turbo",
-        "messages": [{"content": prompt, "role": "user"}],
-    }
-
-    result = _validate_request_attributes(prompt, model_settings)
-    assert result == expected_result, "Empty prompt configuration failed."
-
-
-def test_validate_request_attributes_invalid_model_name():
-    """
-    Test _validate_request_attributes with a non-standard model name.
-    """
-    prompt = "Tell me a joke."
-    model_settings = {"model_name": "nonexistent-model"}
-
-    expected_result = {
-        "model": "nonexistent-model",
-        "messages": [{"content": prompt, "role": "user"}],
-    }
-
-    result = _validate_request_attributes(prompt, model_settings)
-    assert result == expected_result, "Non-standard model configuration failed."
-
-
-def test_get_model_response_basic():
-    """
-    Test get_model_response with a basic prompt and mocked API response.
+    Test generate_initial_answer with mocked response.
     """
     prompt = "What is the capital of France?"
-    model_settings = {"model_name": "gpt-3.5-turbo"}
+    request_settings = {"model_name": "gpt-3.5-turbo", "temperature": 0.7, "top_p": 0.9}
+
+    expected_settings = {"model_name": "gpt-3.5-turbo", "temperature": 0.0, "top_p": 1.0}
 
     mock_response = {"choices": [{"message": {"content": "The capital of France is Paris."}}]}
 
-    with patch(
-        "llm_mcts_inference.inference.litellm.completion", return_value=mock_response
-    ) as mock_completion:
-        response = get_model_response(prompt, model_settings)
-
-        expected_attributes = _validate_request_attributes(prompt, model_settings)
-        mock_completion.assert_called_once_with(**expected_attributes)
+    with patch("litellm.completion", return_value=mock_response) as mock_completion:
+        response = generate_initial_answer(prompt, request_settings)
 
         assert response == "The capital of France is Paris.", "Response content mismatch."
 
+        mock_completion.assert_called_once_with(
+            messages=[{"content": prompt, "role": "user"}], **expected_settings
+        )
 
-def test_get_model_response_empty_prompt():
-    """
-    Test get_model_response with an empty prompt.
-    """
-    prompt = ""
-    model_settings = {"model_name": "gpt-3.5-turbo"}
 
-    mock_response = {"choices": [{"message": {"content": "No input provided."}}]}
+def test_generate_rating():
+    """
+    Test generate_rating with mocked structured response.
+    """
+    prompt = "Rate the answer."
+    answer = "The capital of France is Paris."
+    request_settings = {"model_name": "gpt-3.5-turbo"}
+
+    mock_rating_response = MockRatingResponse(rating=85)
 
     with patch(
-        "llm_mcts_inference.inference.litellm.completion", return_value=mock_response
-    ) as mock_completion:
-        response = get_model_response(prompt, model_settings)
+        "llm_mcts_inference.inference.get_structured_model_response",
+        return_value=mock_rating_response,
+    ):
+        response = generate_rating(prompt, answer, request_settings)
 
-        expected_attributes = _validate_request_attributes(prompt, model_settings)
-        mock_completion.assert_called_once_with(**expected_attributes)
-
-        assert response == "No input provided.", "Response content mismatch for empty prompt."
+        assert response == 0.85, "Normalized rating score mismatch."
 
 
-def test_get_model_response_with_ollama_model():
+def test_generate_feedback():
     """
-    Test get_model_response when using an Ollama model.
+    Test generate_feedback with mocked response.
     """
-    prompt = "Summarize the document."
-    model_settings = {"model_name": "ollama-custom-model"}
+    prompt = "What is the capital of France?"
+    answer = "Paris"
+    request_settings = {"model_name": "gpt-3.5-turbo"}
+
+    expected_message = (
+        "\nYou are an expert assistant analyzing the user's original prompt and the provided initial answer.\n"
+        "Your goal is to give clear, constructive, and concise feedback that will guide improvement.\n\n"
+        "Original Prompt:\nWhat is the capital of France?\n\n"
+        "Initial Answer:\nParis\n\n"
+        "Instructions:\n"
+        "- Provide a high-quality critique that focuses on how this answer could be improved.\n"
+        "- Be concise and to the point.\n"
+        "- Highlight key areas that need correction, clarification, or further detail.\n"
+        "- Do not rewrite or provide the full answer; focus only on providing feedback.\n"
+    )
 
     mock_response = {
-        "choices": [{"message": {"content": "The document discusses AI advancements."}}]
+        "choices": [{"message": {"content": "The answer is correct, but add more details."}}]
     }
 
-    with patch(
-        "llm_mcts_inference.inference.litellm.completion", return_value=mock_response
-    ) as mock_completion:
-        response = get_model_response(prompt, model_settings)
+    with patch("litellm.completion", return_value=mock_response) as mock_completion:
+        response = generate_feedback(prompt, answer, request_settings)
 
-        expected_attributes = _validate_request_attributes(prompt, model_settings)
-        mock_completion.assert_called_once_with(**expected_attributes)
+        assert response == "The answer is correct, but add more details.", "Feedback mismatch."
+
+        mock_completion.assert_called_once_with(
+            messages=[{"content": expected_message, "role": "user"}], **request_settings
+        )
+
+
+def test_generate_improved_version():
+    """
+    Test generate_improved_version with mocked structured response.
+    """
+    prompt = "What is the capital of France?"
+    answer = "Paris"
+    feedback = "Add more details about France."
+    request_settings = {"model_name": "gpt-3.5-turbo"}
+
+    mock_improved_response = MockImprovedResponse(
+        ImprovedText="The capital of France is Paris, located in Europe."
+    )
+
+    with patch(
+        "llm_mcts_inference.inference.get_structured_model_response",
+        return_value=mock_improved_response,
+    ):
+        response = generate_improved_version(prompt, answer, feedback, request_settings)
 
         assert (
-            response == "The document discusses AI advancements."
-        ), "Response content mismatch for Ollama model."
+            response == "The capital of France is Paris, located in Europe."
+        ), "Improved version mismatch."
 
 
-def test_get_model_response_invalid_response_structure():
+def test_get_model_response():
     """
-    Test get_model_response with an invalid API response structure.
+    Test get_model_response with mocked response.
     """
-    prompt = "What is the square root of 16?"
-    model_settings = {"model_name": "gpt-3.5-turbo"}
+    prompt = "What is the capital of France?"
+    request_settings = {"model_name": "gpt-3.5-turbo"}
 
-    mock_response = {}
+    mock_response = {"choices": [{"message": {"content": "The capital of France is Paris."}}]}
 
-    with patch(
-        "llm_mcts_inference.inference.litellm.completion", return_value=mock_response
-    ) as mock_completion:
-        with pytest.raises(KeyError):
-            get_model_response(prompt, model_settings)
+    with patch("litellm.completion", return_value=mock_response) as mock_completion:
+        response = get_model_response(prompt, request_settings)
 
-        expected_attributes = _validate_request_attributes(prompt, model_settings)
-        mock_completion.assert_called_once_with(**expected_attributes)
+        assert response == "The capital of France is Paris.", "Response content mismatch."
+        mock_completion.assert_called_once_with(
+            messages=[{"content": prompt, "role": "user"}], **request_settings
+        )
 
 
 def test_get_structured_model_response():
     """
-    Test get_structured_model_response with a mocked API response.
+    Test get_structured_model_response with mocked structured response.
     """
+    prompt = "What is the capital of France?"
+    request_settings = {"model_name": "gpt-3.5-turbo"}
+    mock_schema = MockImprovedResponse
 
-    class User(BaseModel):
-        name: str
-        age: int
+    mock_structured_response = MockImprovedResponse(
+        ImprovedText="The capital of France is Paris, located in Europe."
+    )
 
-    prompt = "Extract the user details: Jason is 25 years old."
-    model_settings = {"model_name": "gpt-3.5-turbo"}
+    with patch("instructor.from_litellm") as mock_instructor:
+        mock_client = mock_instructor.return_value
+        mock_client.create.return_value = mock_structured_response
 
-    mock_response = User(name="Jason", age=25)
+        response = get_structured_model_response(prompt, request_settings, mock_schema)
 
-    with patch("llm_mcts_inference.inference.litellm.completion") as mock_completion:
-        mock_completion.return_value = mock_response
-
-        with patch("llm_mcts_inference.inference.instructor.from_litellm") as mock_instructor:
-            mock_client = mock_instructor.return_value
-            mock_client.create.return_value = mock_response
-
-            response = get_structured_model_response(prompt, model_settings, User)
-
-            assert response == mock_response, "Structured response mismatch"
-
-            expected_attributes = _validate_request_attributes(prompt, model_settings)
-            expected_attributes["response_model"] = User
-            mock_client.create.assert_called_once_with(**expected_attributes)
-
-
-def test_get_structured_model_response_invalid_schema():
-    """
-    Test get_structured_model_response with an invalid schema in the API response.
-    """
-
-    class User(BaseModel):
-        name: str
-        age: int
-
-    prompt = "Extract the user details: Jason is 25 years old."
-    model_settings = {"model_name": "gpt-3.5-turbo"}
-
-    invalid_response = {"name": "Jason"}
-
-    with patch("llm_mcts_inference.inference.litellm.completion") as mock_completion:
-        mock_completion.return_value = invalid_response
-
-        with patch("llm_mcts_inference.inference.instructor.from_litellm") as mock_instructor:
-            mock_client = mock_instructor.return_value
-            mock_client.create.side_effect = ValueError("Validation failed for response schema.")
-
-            with pytest.raises(ValueError, match="Validation failed for response schema."):
-                get_structured_model_response(prompt, model_settings, User)
+        assert response == mock_structured_response, "Structured response mismatch."
+        mock_client.create.assert_called_once_with(
+            messages=[{"content": prompt, "role": "user"}], **request_settings
+        )

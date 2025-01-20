@@ -71,7 +71,7 @@ def mock_mcts():
     ):
         return MCTS(
             original_prompt="Test prompt",
-            model_settings={
+            request_settings={
                 "base_url": "mock_base_url",
                 "api_key": "mock_api_key",
                 "model_name": "mock_model",

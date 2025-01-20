@@ -3,7 +3,6 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from .config import DEFAULT_SETTINGS
 from .inference import (
     generate_feedback,
     generate_improved_version,
@@ -113,7 +112,7 @@ class MCTS:
         original_prompt (str): The input prompt used for the search process.
         iterations (int): The number of iterations to perform during the search.
         max_children (int): The maximum number of children allowed for each node.
-        model_settings (Dict[str, Any]): Configuration settings for the underlying model.
+        request_settings (Dict[str, Any]): Configuration settings for the underlying model.
         verbose (bool): Whether to print progress information during the search.
         exploration_weight (float): The weight used to balance exploration and exploitation.
         initial_answer (str): The initial answer generated from the input prompt.
@@ -123,20 +122,20 @@ class MCTS:
     def __init__(
         self,
         original_prompt: str,
-        model_settings: Dict[str, Any],
-        iterations: int = DEFAULT_SETTINGS["iterations"],
-        max_children: int = DEFAULT_SETTINGS["max_children"],
-        verbose: bool = DEFAULT_SETTINGS["verbose"],
-        exploration_weight: float = DEFAULT_SETTINGS["exploration_weight"],
+        request_settings: Dict[str, Any],
+        iterations: int,
+        max_children: int,
+        verbose: bool,
+        exploration_weight: float,
     ) -> None:
         self.original_prompt: str = original_prompt
         self.iterations: int = iterations
         self.max_children: int = max_children
-        self.model_settings: Dict[str, Any] = model_settings
+        self.request_settings: Dict[str, Any] = request_settings
         self.verbose: bool = verbose
         self.exploration_weight: float = exploration_weight
 
-        self.initial_answer: str = generate_initial_answer(original_prompt, model_settings)
+        self.initial_answer: str = generate_initial_answer(original_prompt, request_settings)
         self.root: Node = Node(
             original_prompt=self.original_prompt,
             answer=self.initial_answer,
@@ -212,14 +211,14 @@ class MCTS:
             feedback: str = generate_feedback(
                 prompt=self.original_prompt,
                 answer=child_node.answer,
-                model_settings=self.model_settings,
+                request_settings=self.request_settings,
             )
 
             improved_version: str = generate_improved_version(
                 prompt=self.original_prompt,
                 answer=child_node.answer,
                 feedback=feedback,
-                model_settings=self.model_settings,
+                request_settings=self.request_settings,
             )
 
             child_node.answer = improved_version
@@ -254,7 +253,7 @@ class MCTS:
         rating: float = generate_rating(
             prompt=self.original_prompt,
             answer=node.answer,
-            model_settings=self.model_settings,
+            request_settings=self.request_settings,
         )
         return rating
 

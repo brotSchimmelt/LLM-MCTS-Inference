@@ -16,34 +16,34 @@ from .prompts import (  # noqa: E402
 from .utils import normalize_rating_score  # noqa: E402
 
 
-def generate_initial_answer(prompt: str, model_settings: Dict[str, Any]) -> str:
+def generate_initial_answer(prompt: str, request_settings: Dict[str, Any]) -> str:
     """
     Generates the initial answer using greedy decoding.
 
     Args:
         prompt (str): The input prompt to guide the model's response.
-        model_settings (Dict[str, Any]): A dictionary containing configuration settings
+        request_settings (Dict[str, Any]): A dictionary containing configuration settings
             for the model, including temperature, top_p, and other parameters.
 
     Returns:
         str: The initial response from the model as a string.
     """
     # greedy decoding parameters
-    greedy_model_settings = model_settings.copy()
-    greedy_model_settings["temperature"] = 0.0
-    greedy_model_settings["top_p"] = 1.0
+    greedy_request_settings = request_settings.copy()
+    greedy_request_settings["temperature"] = 0.0
+    greedy_request_settings["top_p"] = 1.0
 
-    return get_model_response(prompt, greedy_model_settings)
+    return get_model_response(prompt, greedy_request_settings)
 
 
-def generate_rating(prompt: str, answer: str, model_settings: Dict[str, Any]) -> float:
+def generate_rating(prompt: str, answer: str, request_settings: Dict[str, Any]) -> float:
     """
     Generates a normalized rating score for a given answer based on a prompt and schema.
 
     Args:
         prompt (str): The original input prompt to guide the model's response.
         answer (str): The generated or improved answer to be rated.
-        model_settings (Dict[str, Any]): A dictionary containing configuration settings
+        request_settings (Dict[str, Any]): A dictionary containing configuration settings
             for the model, such as API key, model name, and decoding parameters.
 
     Returns:
@@ -51,7 +51,7 @@ def generate_rating(prompt: str, answer: str, model_settings: Dict[str, Any]) ->
     """
     rating_response = get_structured_model_response(
         rating_prompt.format(original_prompt=prompt, improved_answer=answer),
-        model_settings=model_settings,
+        request_settings=request_settings,
         json_schema=RatingResponse,
     )
     rating = rating_response.rating
@@ -64,21 +64,21 @@ def generate_rating(prompt: str, answer: str, model_settings: Dict[str, Any]) ->
     return normalize_rating_score(rating)
 
 
-def generate_feedback(prompt: str, answer: str, model_settings: Dict[str, Any]) -> str:
+def generate_feedback(prompt: str, answer: str, request_settings: Dict[str, Any]) -> str:
     """
     Generates feedback for a given answer based on the provided prompt.
 
     Args:
         prompt (str): The original input prompt that guided the initial response.
         answer (str): The answer to be critiqued or evaluated.
-        model_settings (Dict[str, Any]): A dictionary containing configuration settings
+        request_settings (Dict[str, Any]): A dictionary containing configuration settings
             for the model, such as API endpoint, model name, and decoding parameters.
 
     Returns:
         str: The generated feedback from the model as a string.
     """
     response = get_model_response(
-        critique_prompt.format(original_prompt=prompt, initial_answer=answer), model_settings
+        critique_prompt.format(original_prompt=prompt, initial_answer=answer), request_settings
     )
 
     if not isinstance(response, str):
@@ -88,7 +88,7 @@ def generate_feedback(prompt: str, answer: str, model_settings: Dict[str, Any]) 
 
 
 def generate_improved_version(
-    prompt: str, answer: str, feedback: str, model_settings: Dict[str, Any]
+    prompt: str, answer: str, feedback: str, request_settings: Dict[str, Any]
 ) -> str:
     """
     Generates an improved version of an answer based on the provided feedback.
@@ -97,7 +97,7 @@ def generate_improved_version(
         prompt (str): The original input prompt that guided the generation of the answer.
         answer (str): The initial answer to be improved.
         feedback (str): Feedback provided for refining the answer.
-        model_settings (Dict[str, Any]): A dictionary containing configuration settings
+        request_settings (Dict[str, Any]): A dictionary containing configuration settings
             for the model, such as API endpoint, model name, and decoding parameters.
 
     Returns:
@@ -105,7 +105,7 @@ def generate_improved_version(
     """
     improved_response = get_structured_model_response(
         refine_prompt.format(original_prompt=prompt, previous_answer=answer, feedback=feedback),
-        model_settings=model_settings,
+        request_settings=request_settings,
         json_schema=ImprovedResponse,
     )
     response = improved_response.ImprovedText
@@ -116,57 +116,33 @@ def generate_improved_version(
     return response
 
 
-def _validate_request_attributes(prompt: str, model_settings: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Prepares and validates the request attributes required to interact with the model API.
-
-    Args:
-        prompt (str): The input prompt or query to be sent to the model.
-        model_settings (Dict[str, Any]): Configuration dictionary.
-
-    Returns:
-        Dict[str, Any]: A dictionary containing the attributes required for the API request.
-    """
-    model_name: str = model_settings["model_name"]
-
-    request_attributes: Dict[str, Any] = {
-        "model": model_name,
-        "messages": [{"content": prompt, "role": "user"}],
-    }
-
-    if "ollama" in model_name:
-        request_attributes["api_base"] = "http://localhost:11434"
-
-    return request_attributes
-
-
-def get_model_response(prompt: str, model_settings: Dict[str, Any]) -> str:
+def get_model_response(prompt: str, request_settings: Dict[str, Any]) -> str:
     """
     Sends a prompt to the model and retrieves a textual response.
 
     Args:
         prompt (str): The input prompt or query to be sent to the model.
-        model_settings (Dict[str, Any]): Configuration dictionary .
+        request_settings (Dict[str, Any]): Configuration dictionary .
 
     Returns:
         str: The model's response as a string extracted from the first choice.
     """
-    request_attributes: Dict[str, Any] = _validate_request_attributes(prompt, model_settings)
-
-    response = litellm.completion(**request_attributes)
+    response = litellm.completion(
+        messages=[{"content": prompt, "role": "user"}], **request_settings
+    )
 
     return str(response["choices"][0]["message"]["content"])
 
 
 def get_structured_model_response(
-    prompt: str, model_settings: Dict[str, Any], json_schema: Any
+    prompt: str, request_settings: Dict[str, Any], json_schema: Any
 ) -> Any:
     """
     Sends a prompt to the model and retrieves a structured response based on a provided JSON schema.
 
     Args:
         prompt (str): The input prompt or query to be sent to the model.
-        model_settings (Dict[str, Any]): Configuration dictionary.
+        request_settings (Dict[str, Any]): Configuration dictionary.
         json_schema (Any): A Pydantic model used to validate the structured response.
 
     Returns:
@@ -175,9 +151,8 @@ def get_structured_model_response(
     """
     client = instructor.from_litellm(litellm.completion)
 
-    request_attributes: Dict[str, Any] = _validate_request_attributes(prompt, model_settings)
-    request_attributes["response_model"] = json_schema
+    request_settings["response_model"] = json_schema
 
-    response = client.create(**request_attributes)
+    response = client.create(messages=[{"content": prompt, "role": "user"}], **request_settings)
 
     return response
