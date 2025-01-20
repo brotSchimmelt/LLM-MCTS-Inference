@@ -5,7 +5,7 @@ build/
 dist/
 wheels/
 *.egg-info
-_*.py
+_local*.py
 *.lock
 
 # virtual environments
