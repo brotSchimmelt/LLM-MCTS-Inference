@@ -1,5 +1,7 @@
 # LLM MCTS Inference
 
+![Tests](https://img.shields.io/github/actions/workflow/status/brotSchimmelt/LLM-MCTS-Inference/test.yml?style=flat-square&label=Tests&color=green)
+
 An experimental project using Monte Carlo Tree Search (MCTS) to refine Language Model (LLM) responses for better accuracy and decision-making.
 
 ## Overview
