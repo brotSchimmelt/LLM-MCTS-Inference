@@ -1,6 +1,6 @@
 [project]
 name = "llm-mcts-inference"
-version = "0.1.0"
+version = "0.1.1"
 description = "An experimental project using Monte Carlo Tree Search (MCTS) to refine LLM responses for better accuracy and decision-making."
 readme = "README.md"
 requires-python = ">=3.11"
