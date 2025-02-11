@@ -4,6 +4,13 @@ version = "0.1.2"
 description = "An experimental project using Monte Carlo Tree Search (MCTS) to refine LLM responses for better accuracy and decision-making."
 readme = "README.md"
 requires-python = ">=3.11"
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "graphviz>=0.20.3",
     "instructor>=1.7.2",
@@ -12,6 +19,10 @@ dependencies = [
     "python-dotenv>=1.0.1",
 ]
 
+[project.urls]
+Homepage = "https://github.com/brotSchimmelt/LLM-MCTS-Inference"
+Issues = "https://github.com/brotSchimmelt/LLM-MCTS-Inference/issues"
+
 [dependency-groups]
 dev = ["mypy>=1.14.1", "pytest>=8.3.4"]
 
@@ -19,7 +30,6 @@ dev = ["mypy>=1.14.1", "pytest>=8.3.4"]
 lint.select = ["E", "F"]
 lint.per-file-ignores = { "__init__.py" = ["F401"] }
 line-length = 100
-
 
 [build-system]
 requires = ["hatchling"]
