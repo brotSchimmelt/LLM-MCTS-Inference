@@ -5,6 +5,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  id-token: write
+
 jobs:
   publish:
     name: Build and Publish to PyPI
@@ -28,7 +31,5 @@ jobs:
           uv build
 
       - name: Publish package to PyPI
-        env:
-          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         run: |
-          echo -e "__token__\n${PYPI_API_TOKEN}" | uv publish
+          uv publish
